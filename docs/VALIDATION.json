@@ -10,10 +10,13 @@
   "pending": [
     "Real BSense device and display onset timing",
     "Actual participant P300 performance and artifacts",
-    "Windows setup/CI execution",
     "Online free selection and no-intent evaluation",
     "Physical robot/race validation"
   ],
-  "git": "No commit, push or remote repository creation performed",
-  "source_only_package": true
+  "git": "Standalone project published to shaun5297/bsense-p300-pilot; existing controller repository changes remain local",
+  "source_only_package": true,
+  "windows_ci": "Installation script and tests passed on windows-latest, Python 3.12",
+  "macos_ci": "Installation script and tests passed on macos-latest, Python 3.12",
+  "ci_url": "https://github.com/shaun5297/bsense-p300-pilot/actions/runs/34571175832",
+  "ci_code_commit": "75480da290c85a307ec7d6277421ba21e8188bd9"
 }

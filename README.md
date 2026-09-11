@@ -22,6 +22,8 @@
 
 ## 启动
 
+Windows 安装脚本和软件测试已通过 [GitHub Actions](https://github.com/shaun5297/bsense-p300-pilot/actions/runs/34571175832)。实验室首次连设备请按 [Windows 设备试测说明](windows/README.md) 操作；真实设备验证仍待完成。
+
 需要 Python 3.11–3.13（含 Tk），设备软件发布双通道 FP1/FP2 EEG 的 LSL 流。
 
 macOS：
@@ -125,4 +127,4 @@ XDF EEG 保留源时间戳，通过 ClockOffset 转到本机时钟；Marker 用�
 python -m pytest -q
 ```
 
-测试使用显式标记的合成信号，覆盖协议平衡与时限、独立分段、时序与数据缺陷、XDF 读回、真实本机 LSL 传输和中止保存。软件测试不能替代设备、Windows 和赛场验证。代码来源见 [UPSTREAM.md](docs/UPSTREAM.md)。
+测试使用显式标记的合成信号，覆盖协议平衡与时限、独立分段、时序与数据缺陷、XDF 读回、真实本机 LSL 传输和中止保存。软件测试不能替代真实设备和赛场验证。代码来源见 [UPSTREAM.md](docs/UPSTREAM.md)。
