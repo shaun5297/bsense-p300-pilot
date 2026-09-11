@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bsense-p300-pilot"
+version = "0.1.0"
+description = "Short repeated P300 acquisition and subject-specific calibration"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = ["pylsl==1.18.2", "numpy>=1.26,<3", "scipy>=1.11,<2", "scikit-learn>=1.4,<2", "joblib>=1.3,<2", "pyxdf>=1.16,<2"]
+
+[project.optional-dependencies]
+test = ["pytest>=8,<10"]
+
+[project.scripts]
+bsense-p300-pilot = "bsense_p300_pilot.app:main"
+bsense-p300-train = "bsense_p300_pilot.training:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

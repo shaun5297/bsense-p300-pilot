@@ -1,0 +1,72 @@
+diff --git a/src/bsense_classifier/robot_app.py b/src/bsense_classifier/robot_app.py
+index a242a97..d8ee885 100644
+--- a/src/bsense_classifier/robot_app.py
++++ b/src/bsense_classifier/robot_app.py
+@@ -71,6 +71,9 @@ def _default_bridge_config() -> str:
+ 
+ class RobotControlApp:
+     def __init__(self, root: tk.Tk, args: argparse.Namespace) -> None:
++        self.sequences_per_trial = getattr(args, "sequences_per_trial", SEQUENCES_PER_TRIAL)
++        if self.sequences_per_trial not in range(2, 11):
++            raise ValueError("每次选择的闪烁轮数必须在 2–10 之间。")
+         self.root = root
+         self.root.title("BSense P300 脑控机器狗")
+         self.root.geometry("1420x900")
+@@ -550,7 +553,10 @@ class RobotControlApp:
+             return
+         self.engine = P300ControlEngine(
+             self.runtime,
+-            P300EngineConfig(stream_name=self.stream_name.get().strip()),
++            P300EngineConfig(
++                stream_name=self.stream_name.get().strip(),
++                minimum_flashes_per_command=min(6, self.sequences_per_trial),
++            ),
+         )
+         self.engine.start()
+         self.decoder_status.set("正在连接 EEG")
+@@ -626,7 +632,7 @@ class RobotControlApp:
+     def _build_flash_plan(self) -> list[tuple[int, int, RobotCommand]]:
+         plan: list[tuple[int, int, RobotCommand]] = []
+         previous = self._previous_flash
+-        for sequence in range(1, SEQUENCES_PER_TRIAL + 1):
++        for sequence in range(1, self.sequences_per_trial + 1):
+             order = list(P300_COMMANDS)
+             for _attempt in range(20):
+                 random.shuffle(order)
+@@ -647,7 +653,7 @@ class RobotControlApp:
+         self._flash_plan = self._build_flash_plan()
+         self._flash_index = 0
+         self._selection_running = True
+-        self.trial_status.set(f"Trial {self._trial_id} · 0/{SEQUENCES_PER_TRIAL}")
++        self.trial_status.set(f"Trial {self._trial_id} · 0/{self.sequences_per_trial}")
+         self.result_text.set("注视目标")
+         self.result_detail.set("刺激开始，请减少眨眼和面部动作。")
+         for variable in self.score_labels.values():
+@@ -671,7 +677,7 @@ class RobotControlApp:
+         sequence, position, command = self._flash_plan[self._flash_index]
+         self._flash_index += 1
+         self.trial_status.set(
+-            f"Trial {self._trial_id} · {sequence}/{SEQUENCES_PER_TRIAL}"
++            f"Trial {self._trial_id} · {sequence}/{self.sequences_per_trial}"
+         )
+         tile = self.command_tiles[command]
+         tile.configure(bg=CYAN, fg=BG, highlightbackground="white")
+@@ -869,6 +875,7 @@ class RobotControlApp:
+     def _write_audit(self, record: dict[str, object]) -> None:
+         payload = {
+             "timestamp_utc": datetime.now(timezone.utc).isoformat(),
++            "sequences_per_trial": self.sequences_per_trial,
+             **record,
+         }
+         self.audit_path.parent.mkdir(parents=True, exist_ok=True)
+@@ -891,6 +898,10 @@ class RobotControlApp:
+ 
+ def build_parser() -> argparse.ArgumentParser:
+     parser = argparse.ArgumentParser(description="BSense P300 脑控机器狗控制台")
++    parser.add_argument(
++        "--sequences-per-trial", type=int, choices=range(2, 11), default=SEQUENCES_PER_TRIAL,
++        help="每次选择的闪烁轮数（默认 10）；缩短前需完成参赛者个体校准和在线验证。",
++    )
+     parser.add_argument("--model", default="", help="m7_p300 model.joblib 路径")
+     parser.add_argument("--stream-name", default="", help="EEG LSL 流名称")
+     parser.add_argument(

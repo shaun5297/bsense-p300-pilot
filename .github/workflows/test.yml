@@ -1,0 +1,27 @@
+name: software-tests
+on: [push, pull_request]
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Windows setup script
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: call windows\setup.bat 3.12
+      - name: macOS setup script
+        if: runner.os == 'macOS'
+        run: bash macos/setup.sh
+      - name: Windows tests
+        if: runner.os == 'Windows'
+        shell: cmd
+        run: .venv\Scripts\python.exe -m pytest -q
+      - name: macOS tests
+        if: runner.os == 'macOS'
+        run: .venv/bin/python -m pytest -q

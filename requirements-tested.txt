@@ -1,0 +1,14 @@
+cloudpickle==3.1.2
+iniconfig==2.3.0
+joblib==1.6.0
+narwhals==2.26.0
+numpy==2.5.3
+packaging==26.3
+pluggy==1.6.0
+Pygments==2.21.0
+pylsl==1.18.2
+pytest==9.1.1
+pyxdf==1.17.5
+scikit-learn==1.9.1
+scipy==1.18.1
+threadpoolctl==3.6.0

@@ -1,0 +1,19 @@
+{
+  "date": "2026-09-11",
+  "status": "SOFTWARE_VALIDATED_REAL_DEVICE_PENDING",
+  "standalone_tests": "20 passed; training tests rerun after software-version provenance addition: 6 passed",
+  "controller_targeted_tests": "22 passed",
+  "compatibility": "Synthetic model exported, loaded by existing ModelRuntime, 120 ERP features exactly identical, two-class inference succeeded",
+  "lsl": "Real local LSL transport with synthetic samples; XDF readback and abort preservation passed",
+  "gui": "Native Tk construction, startup and four UI state tests passed; portable-Python Tcl lookup fixed; CUA could not attach to bare Python app for screenshots",
+  "review": "Independent read-only review completed; live-writer stop-failure recovery fixed and tested",
+  "pending": [
+    "Real BSense device and display onset timing",
+    "Actual participant P300 performance and artifacts",
+    "Windows setup/CI execution",
+    "Online free selection and no-intent evaluation",
+    "Physical robot/race validation"
+  ],
+  "git": "No commit, push or remote repository creation performed",
+  "source_only_package": true
+}
