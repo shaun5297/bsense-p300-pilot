@@ -2,6 +2,7 @@ import json
 import threading
 import time
 import uuid
+from collections import deque
 
 import numpy as np
 import pyxdf
@@ -9,6 +10,49 @@ from pylsl import StreamInfo, StreamOutlet, local_clock, resolve_byprop
 import pytest
 
 from bsense_p300_pilot.recording import Recording, channel_order
+
+
+def health_recorder(age=0, inversions=0, data=None):
+    recorder = Recording.__new__(Recording)
+    recorder.lock = threading.Lock()
+    recorder.recent = deque(data if data is not None else np.column_stack((np.arange(200), np.arange(200))))
+    recorder.last_received = time.monotonic()-age
+    recorder.receive_started = time.monotonic()-30
+    recorder.samples = len(recorder.recent)
+    recorder.inversions = inversions
+    recorder.errors = []
+    return recorder
+
+
+def test_transient_gap_and_timestamp_history_warn_without_aborting():
+    recorder = health_recorder(age=3, inversions=1)
+    health = recorder.health()
+    assert health["ok"] and len(health["warnings"]) == 2
+    recorder.last_received = time.monotonic()
+    assert len(recorder.health()["warnings"]) == 1
+
+
+@pytest.mark.parametrize("data", [np.zeros((200, 2)), np.full((200, 2), np.nan)])
+def test_signal_quality_is_a_recorded_warning(data):
+    health = health_recorder(data=data).health()
+    assert health["ok"] and health["warnings"]
+
+
+def test_persistent_disconnect_and_recording_errors_still_block():
+    recorder = health_recorder(age=10.1)
+    assert not recorder.health()["ok"]
+    recorder.last_received = time.monotonic()
+    recorder.errors = ["disk write failed"]
+    assert recorder.health()["reason"] == "disk write failed"
+
+
+def test_initial_wait_has_ten_second_grace():
+    recorder = health_recorder(data=[])
+    recorder.last_received = None
+    recorder.receive_started = time.monotonic()-3
+    assert recorder.health()["ok"]
+    recorder.receive_started = time.monotonic()-11
+    assert not recorder.health()["ok"]
 
 
 def eeg_info(labels=("FP1", "FP2")):

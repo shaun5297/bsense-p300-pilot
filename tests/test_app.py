@@ -74,3 +74,61 @@ def test_failed_stop_keeps_live_recorder_and_retry_entry(app):
     app.finish = Mock()
     app.abort()
     app.finish.assert_called_once_with("complete", "协议完成")
+
+
+def test_fullscreen_hides_controls_and_restores_them(app):
+    app.root.attributes = Mock()
+    app._acquisition_display(True)
+    app.root.attributes.assert_called_with("-fullscreen", True)
+    assert app.sidebar.winfo_manager() == ""
+    app._acquisition_display(False)
+    app.root.attributes.assert_called_with("-fullscreen", False)
+    assert app.sidebar.winfo_manager() == "pack"
+    assert app.header.winfo_manager() == "pack"
+
+
+@pytest.mark.parametrize("samples,proceeds", [(0, False), (200, True)])
+def test_qc_transition_requires_samples_but_allows_warning(app, samples, proceeds):
+    app.recording = Mock()
+    app.recording.health.return_value = {"ok": True, "samples": samples, "warnings": ["平直"]}
+    app.started = time.monotonic()
+    app.current = Step("device_qc", 30, "检查")
+    app.plan = [Step("baseline_open", 30, "静息")]
+    app.finish = Mock()
+    app._next()
+    if proceeds:
+        app.finish.assert_not_called()
+        assert app.current.event == "baseline_open"
+        app.root.after_cancel(app.after_step)
+    else:
+        assert app.finish.call_args.args[0] == "quality_failed"
+        app.recording.mark.assert_not_called()
+
+
+def test_quality_warning_and_recovery_are_logged_without_stopping(app):
+    app.recording = Mock()
+    app.started = app.step_started = time.monotonic()
+    app.current = Step("baseline_open", 30, "静息")
+    app.finish = Mock()
+    app.root.after = Mock()
+    health = {"ok": True, "reason": "ok", "samples": 200, "warnings": ["EEG 暂时无新数据"]}
+    app.recording.health.return_value = health
+    app._poll()
+    app._poll()
+    assert app.recording.mark.call_count == 1
+    assert "暂时无新数据" in app.status.get()
+    health["warnings"] = []
+    app._poll()
+    assert app.recording.mark.call_args.args == ("acquisition_quality", {"warnings": [], "samples": 200})
+    app.finish.assert_not_called()
+
+
+def test_disconnect_stops_even_during_device_check(app):
+    app.recording = Mock()
+    app.started = app.step_started = time.monotonic()
+    app.current = Step("device_qc", 30, "检查")
+    app.recording.health.return_value = {"ok": False, "reason": "EEG 持续 10 秒无新数据", "samples": 0}
+    app.finish = Mock()
+    app.root.after = Mock()
+    app._poll()
+    app.finish.assert_called_once_with("quality_failed", "EEG 持续 10 秒无新数据")

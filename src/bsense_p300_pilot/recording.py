@@ -58,6 +58,7 @@ class Recording:
         self.samples = 0
         self.first = self.last = 0.0
         self.last_received = None
+        self.receive_started = time.monotonic()
         self.offsets = []
         self.errors = []
         self.marker_times = []
@@ -86,7 +87,9 @@ class Recording:
             self.events_file = (self.path/"events.jsonl").open("x", encoding="utf-8")
             self.format = full.channel_format()
             self.context["status"] = "recording"
+            self.context["acquisition_quality_policy"] = "warnings_continue_disconnect_10s_v1"
             self._save_context()
+            self.receive_started = time.monotonic()
             self.worker = threading.Thread(target=self._record, daemon=True)
             self.worker.start()
         except Exception as error:
@@ -139,22 +142,27 @@ class Recording:
     def health(self):
         with self.lock:
             data = np.asarray(list(self.recent), dtype=float)
-            age = time.monotonic()-self.last_received if self.last_received else float("inf")
+            age = time.monotonic()-(self.last_received if self.last_received is not None else self.receive_started)
             count = self.samples
+            inversions = self.inversions
         reason = "ok"
+        warnings = []
         if self.errors:
             reason = self.errors[-1]
-        elif self.inversions:
-            reason = "EEG 时间戳倒序或重复"
-        elif age > 2:
-            reason = "EEG 无新数据"
-        elif len(data) < 100:
-            reason = "EEG 样本不足"
+        elif age >= 10:
+            reason = "EEG 持续 10 秒无新数据，请检查设备与 LSL 发布软件"
+        if inversions:
+            warnings.append("EEG 曾有时间戳倒序或重复，训练前需检查")
+        if age > 2:
+            warnings.append("EEG 暂时无新数据，正在等待恢复")
+        if len(data) < 100:
+            warnings.append("EEG 样本不足，正在等待")
         elif not np.isfinite(data).all():
-            reason = "EEG 含非有限数"
+            warnings.append("EEG 含非有限数，请检查设备")
         elif np.any(data.std(axis=0) < 1e-8):
-            reason = "EEG 通道平直"
-        return {"ok": reason == "ok", "reason": reason, "samples": count}
+            warnings.append("EEG 通道平直，请调整电极接触")
+        return {"ok": reason == "ok", "reason": reason, "samples": count,
+                "warnings": warnings, "age_seconds": age}
 
     def mark(self, event: str, metadata=None, timestamp=None):
         stamp = local_clock() if timestamp is None else timestamp

@@ -53,6 +53,7 @@ class App:
         self.closing = False
         self.cancel_start = False
         self.current = None
+        self.health_warnings = ()
         self.after_step = self.after_off = None
         self.index = 0
         self.plan = []
@@ -83,12 +84,14 @@ class App:
 
     def _build(self):
         header = tk.Frame(self.root, bg=BG, padx=22, pady=16)
+        self.header = header
         header.pack(fill="x")
         self._label(header, "P300 个体采集", size=23).pack(anchor="w")
         self._label(header, "一次一组 · 可重复测量 · 原始脑电与事件同步保存", color=MUTED).pack(anchor="w", pady=(5,0))
         body = tk.Frame(self.root, bg=BG, padx=22)
         body.pack(fill="both", expand=True)
         sidebar = tk.Frame(body, bg=CARD, width=345)
+        self.sidebar = sidebar
         sidebar.pack(side="left", fill="y", padx=(0,18))
         sidebar.pack_propagate(False)
         canvas = tk.Canvas(sidebar, bg=CARD, highlightthickness=0, width=330)
@@ -152,6 +155,7 @@ class App:
         self.train_button.pack(fill="x", pady=8)
         self.inputs.append(self.train_button)
         right = tk.Frame(body, bg=BG)
+        self.task_panel = right
         right.pack(side="left", fill="both", expand=True)
         title = self._label(right, variable=self.task_text, size=21)
         title.configure(wraplength=680)
@@ -250,6 +254,15 @@ class App:
         for tile in self.tiles:
             tile.configure(bg=CARD, fg=TEXT, highlightbackground=CARD)
 
+    def _acquisition_display(self, active):
+        self.root.attributes("-fullscreen", active)
+        if active:
+            self.header.pack_forget()
+            self.sidebar.pack_forget()
+        else:
+            self.header.pack(before=self.sidebar.master, fill="x")
+            self.sidebar.pack(before=self.task_panel, side="left", fill="y", padx=(0,18))
+
     def _next(self):
         self.after_step = None
         if not self.recording or self.finishing:
@@ -258,6 +271,11 @@ class App:
             self.finish("time_limit", "已达到 20 分钟上限")
             return
         step = self.plan[self.index]
+        if self.current and self.current.event == "device_qc":
+            health = self.recording.health()
+            if not health["ok"] or health["samples"] < 100:
+                self.finish("quality_failed", health["reason"] if not health["ok"] else "设备检查结束时 EEG 样本不足 100 个")
+                return
         self.current = step
         self.index += 1
         try:
@@ -315,6 +333,7 @@ class App:
             if token:
                 self.root.after_cancel(token)
         self.after_step = self.after_off = None
+        self._acquisition_display(False)
         self._clear_tiles()
         self.task_text.set("正在保存记录")
         recorder = self.recording
@@ -364,6 +383,9 @@ class App:
                             self.finish("aborted", "连接期间取消")
                         else:
                             self.index = 0
+                            self.current = None
+                            self.health_warnings = ()
+                            self._acquisition_display(True)
                             self.data_started = time.monotonic()
                             self.status.set("已开始真实 EEG/XDF 录制；不适或需要结束时按 Esc。")
                             self._next()
@@ -392,11 +414,19 @@ class App:
             self.clock_text.set(f"已用 {mmss(elapsed)} / 20:00 · 当前阶段剩余 {mmss(remaining)}")
             if elapsed >= HARD_LIMIT:
                 self.finish("time_limit", "已达到 20 分钟上限")
-            elif (time.monotonic()-self.data_started > 5 and not health["ok"]
-                  and (self.current.event != "device_qc" or self.recording.errors)):
+            elif not health["ok"]:
                 self.finish("quality_failed", health["reason"])
-            elif self.current.event == "device_qc":
-                self.status.set(f"设备检查：{health['reason']} · 已录制 {health['samples']} 个样本；检查结束仍异常则中止。")
+            else:
+                warnings = tuple(health["warnings"])
+                if warnings != self.health_warnings:
+                    try:
+                        self.recording.mark("acquisition_quality", {"warnings": list(warnings), "samples": health["samples"]})
+                    except Exception as error:
+                        self.finish("recording_error", str(error))
+                    self.health_warnings = warnings
+                if not self.finishing:
+                    detail = "；".join(warnings) if warnings else "EEG 正在接收"
+                    self.status.set(f"{detail} · 已录制 {health['samples']} 个样本。质量提示不阻断采集；持续 10 秒断流才中止。")
         self.root.after(100, self._poll)
 
     def _handle_stop(self, result, error):
